@@ -104,3 +104,4 @@ ENV/
 venv
 .project
 .pydevproject
+.settings/
