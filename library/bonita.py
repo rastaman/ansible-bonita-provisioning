@@ -5,13 +5,16 @@ import json
 import ast
 import traceback
 import time
+import sys
 
 from ansible.module_utils.basic import AnsibleModule
 
 try:
-    from bonita.api.bonita_client import BonitaClient
+    import bonita.commands
+    from inspect import getmembers, isclass, getmodule      
     HAS_BONITA_CLI = True
 except:
+    
     HAS_BONITA_CLI = False
 
 DOCUMENTATION = '''
@@ -59,9 +62,18 @@ class Bonita:
     Class used to centralize the operations with Bonita
     """
 
-    def __init__(self, module, verbose=False):
-        self.module = module
+    def __init__(self, options, verbose=False):
+        self.options = options
         self.logs = []
+
+    def run(self):
+        for (k, v) in self.options.items(): 
+            if hasattr(bonita.commands, k) and v:
+                module = getattr(bonita.commands, k)
+                bonita.commands = getmembers(module, isclass)
+                command = [command[1] for command in bonita.commands if command[0] != 'Base' and getmodule(command[1]).__name__.startswith('bonita.commands') ][0]
+                command = command(self.options)
+                command.run()
 
     def log(self, s):
         self.logs.append(s)
@@ -71,20 +83,8 @@ class Bonita:
 def main():
     module = AnsibleModule(
         argument_spec={
-            "session": {'type': 'str', 'default': None, 'choices': ['login','logout','get']},
-            "platform": {'type': 'str', 'default': None},
-            "process": {'type': 'str', 'default': None},
-            "system": {'type': 'str', 'default': None},
-            "upload": {'type': 'str', 'default': None},
-            "session": {'type': 'str', 'default': None},
-            # Configuration
-            "configuration": {'type': 'path', 'default': '~/.bonita'},
-            # Session parameters
-            "url": {'type': 'str', 'default': None},
-            "username": {'type': 'str', 'default': None},
-            "password": {'type': 'str', 'default': None},
-            # Global
-            "verbose": {'type': 'bool', 'default': False}
+            "args": {'type': 'dict', 'required': True},
+            "verbose": {'type': 'bool', 'default': 'false'}
         }
     )
 
@@ -94,8 +94,13 @@ def main():
         logging.basicConfig(filename=LOGGER_FILE,
                             level=logging.DEBUG)
         LOGGER.debug('--- %s ---', time.strftime("%H:%M:%S"))
+        LOGGER.debug(sys.path)
     else:
         LOGGER.setLevel(logging.INFO)
+
+    LOGGER.debug('Bonita cli available: %s' % HAS_BONITA_CLI)
+    bonita_cli = Bonita(module.params['args'])
+    bonita_cli.run()
 
     result = dict() 
     result['rc'] = 200
