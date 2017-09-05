@@ -58,7 +58,8 @@ class Bonita:
                 command = command(self.options)
                 command.headless = True
                 command.run()
-                return command.results
+                return command.getResults()
+        return None
 
 def main():
     module = AnsibleModule(
@@ -82,6 +83,10 @@ def main():
     bonita_cli = Bonita(module.params['args'])
     result = bonita_cli.run()
     
+    changed = False
+    if result['rc'] == 200:
+        changed = True
+
     module.exit_json(changed=changed, result=result)
 
 if __name__ == '__main__':
